@@ -70,7 +70,14 @@ class TestMatcher(unittest.TestCase):
         self.assertEqual(catcher1.count,1)
         self.assertEqual(catcher2.count,0)
 
-         
+    def test_partial_match(self):
+        matcher = SMTPDispatcher.Matcher()
+        catcher1 = Catcher()
+        matcher.register(r"[0-9]+", catcher1.call)
+
+        # verify match works if only partial unless regex specifies
+        matcher.match("0123@test.com")
+        self.assertEqual(catcher1.count,1)
 
 if __name__ == '__main__':
     unittest.main()
