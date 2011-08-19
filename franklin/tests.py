@@ -1,6 +1,7 @@
 import unittest
 import SMTPDispatcher
-
+import smtplib
+import asyncore
 
 class Catcher:
     def __init__(self):
@@ -78,6 +79,66 @@ class TestMatcher(unittest.TestCase):
         # verify match works if only partial unless regex specifies
         matcher.match("0123@test.com")
         self.assertEqual(catcher1.count,1)
+
+class SMTPHandler:
+    def __init__(self):
+        self.peer = None
+        self.mailfrom = None
+        self.mailtos = None
+        self.message = None
+    
+    def handle(self, peer, mailfrom, mailtos, message):
+        self.peer = peer
+        self.mailfrom = mailfrom
+        self.mailtos = mailtos
+        self.message = message
+
+import threading
+import os
+class MonitorThread(threading.Thread):
+    def run(self):
+        try:
+            asyncore.loop(timeout=1)
+        except:
+            # dont' care if async core dies during testing
+            # async core is not the UUT
+            pass
+
+
+class TestSMTPDispatcher(unittest.TestCase):
+    def setUp(self):
+        self.server = SMTPDispatcher.SMTPDispatcher(("localhost",1234), None)
+
+    def test_single_dispatch(self):
+        handler = SMTPHandler()
+        self.server.route(r'.*', handler.handle)
+        thd = MonitorThread()
+        thd.start()
+
+        smtp = smtplib.SMTP("localhost",1234)
+        smtp.sendmail("test@test.com", "dest@test.com", "Hello")
+        smtp.quit()
+        self.assertEqual(handler.mailfrom, "test@test.com")
+        self.assertEqual(handler.message, "Hello")
+
+    def test_multiple_dispatch(self):
+        handler1 = SMTPHandler()
+        handler2 = SMTPHandler()
+        self.server.route(r'[0-9]+@test.com', handler2.handle)
+        self.server.route(r'[a-z]+@test.com', handler1.handle)
+
+        thd = MonitorThread()
+        thd.start()
+
+        smtp = smtplib.SMTP("localhost",1234)
+        smtp.sendmail("test@test.com", "dest@test.com", "Hello")
+        smtp.quit()
+        self.assertEqual(handler1.mailfrom, "test@test.com")
+        self.assertEqual(handler1.message, "Hello")
+
+
+    def tearDown(self):
+        self.server.close()
 
 if __name__ == '__main__':
     unittest.main()
