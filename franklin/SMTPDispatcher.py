@@ -35,7 +35,7 @@ class Matcher:
 
     def register( self, pattern, callback ):
         """ Register a pattern and callback """
-        self.patterns.append( (pattern, callback) )
+        self.patterns.append((pattern, callback))
 
     def match( self, text, *args, **kw ):
         longest = -1
@@ -44,18 +44,21 @@ class Matcher:
 
         for (pattern, callback) in self.patterns:
             match = re.match( pattern, text )
-
             if match:
                 (start,end) = match.span()
                 length = end - start
 
+                # match longer matches
                 if length > longest:
+                    longest = length
                     longest_match = match
                     longest_callback = callback
 
+        # if a match found call it
         if longest_match != None:
-            params = list(longest_match.groups())
-            callback( *(args + params), **kw)
+            params = longest_match.groups()
+            # call callback
+            apply( longest_callback, args + params, **kw)
 
 class SMTPDispatcher(smtpd.SMTPServer):
     """A dispatching SMTP host
